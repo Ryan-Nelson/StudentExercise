@@ -3,7 +3,6 @@ using StudentExercisesMVC.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -12,69 +11,53 @@ namespace StudentExercisesMVC.Models.ViewModels
     public class StudentEditViewModel
     {
         // A single student
-        public Student Student { get; set; } = new Student();
+        public Student Student { get; set; }
 
         // All cohorts
-        [Display(Name="Select Cohort")]
         public List<SelectListItem> Cohorts;
 
-        public string _connectionString;
+        // Property to hold all training sessions for selection on edit form
+        [Display(Name = "Assigned Exercises")]
+        public List<SelectListItem> Exercises { get; private set; }
 
-        public SqlConnection Connection
-        {
-            get
-            {
-                return new SqlConnection(_connectionString);
-            }
-        }
+        public List<int> SelectedExercises { get; set; }
 
 
         public StudentEditViewModel() { }
-
-        public StudentEditViewModel(int id, string connectionString)
+        public StudentEditViewModel(int id)
         {
-            _connectionString = connectionString;
-            GetAllCohorts();
-            Student = StudentRepository.GetStudent(id, connectionString);
+            Student = StudentRepository.GetStudent(id);
+            BuildCohortOptions();
+            BuildExerciseOptions();
         }
 
-        public void GetAllCohorts ()
+        private void BuildExerciseOptions()
         {
-            using (SqlConnection conn = Connection)
-            {
-                conn.Open();
-                using (SqlCommand cmd = conn.CreateCommand())
+            //var exercises = ExerciseRepository.GetExercises();
+            Exercises = ExerciseRepository.GetExercises()
+                .Select(e => new SelectListItem
                 {
-                    cmd.CommandText = @"SELECT c.Id, c.Name from Cohort c";
+                    Text = e.Name,
+                    Value = e.Id.ToString(),
+                    Selected = Student.AssignedExercises.Find(ex => ex.Id == e.Id) != null
+                }).ToList();
+        }
 
-                    SqlDataReader reader = cmd.ExecuteReader();
+        public void BuildCohortOptions()
+        {
+            Cohorts = CohortRepository.GetCohorts()
+                .Select(li => new SelectListItem
+                {
+                    Text = li.Name,
+                    Value = li.Id.ToString()
+                }).ToList();
 
-                    List<Cohort> cohorts = new List<Cohort>();
+            Cohorts.Insert(0, new SelectListItem
+            {
+                Text = "Choose cohort...",
+                Value = "0"
+            });
 
-                    while (reader.Read())
-                    {
-                        Cohort cohort = new Cohort
-                        {
-                            Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                            Name = reader.GetString(reader.GetOrdinal("Name"))
-                        };
-
-                        cohorts.Add(cohort);
-                    }
-
-                    Cohorts = cohorts.Select(li => new SelectListItem
-                    {
-                        Text = li.Name,
-                        Value = li.Id.ToString()
-                    }).ToList();
-
-                    Cohorts.Insert(0, new SelectListItem
-                    {
-                        Text = "Choose cohort...",
-                        Value = "0"
-                    });
-                }
-            }
         }
     }
 }
